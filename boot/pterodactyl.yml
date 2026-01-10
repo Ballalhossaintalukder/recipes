@@ -2,7 +2,7 @@ source: https://github.com/pterodactyl/panel
 root: public_html/public
 features:
   - php 8.2
-  - node 14
+  - node 24
   - mysql
   - redis
 nginx:
