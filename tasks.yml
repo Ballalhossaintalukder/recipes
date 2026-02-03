@@ -1,0 +1,88 @@
+tasks:
+- title: Install Compiler
+  args:
+    - software=node|php|python|ruby|go|java|dotnet|zig|docker
+    - version
+  script: |
+    features:
+    - "[node] [latest]"
+- title: Remove Compiler
+  args:
+    - software=node|php|python|ruby|go|java|dotnet|zig|docker
+  script: |
+    features:
+    - "[node] off"
+- title: Create a database
+  args:
+    - backend=mysql|postgresql|redis
+    - name
+  script: |
+    features:
+    - "[mysql] create [db]"
+- title: Drop a database
+  args:
+    - backend=mysql|postgresql|redis
+    - name
+  script: |
+    features:
+    - "[mysql] drop [db]"
+- title: Toggle SSH Feature
+  args:
+    - toggle=on|off
+  script: |
+    features:
+    - "ssh [on]"
+- title: Toggle Firewall Feature
+  args:
+    - toggle=on|off
+  script: |
+    features:
+    - "firewall [on]"
+- title: Toggle SSL redirection
+  args:
+    - toggle=always|on|off
+  script: |
+    features:
+    - "ssl [on]"
+tasks_root:
+- title: Create a Website
+  args:
+    - domain
+    - username
+    - password
+    - email
+  script: |
+    features:
+    - create:
+       domain: [example.com]
+       username: [myuser]
+       pass: [foobar]
+       email: [myuser@example.com]
+    - ssl
+- title: Change password
+  args:
+    - new-password
+  script: |
+    features:
+    - modify:
+       pass: [foobar]
+- title: Rename user
+  args:
+    - new-user
+  script: |
+    features:
+    - rename:
+       new-user: [myuser]
+- title: Rename domain
+  args:
+    - new-domain
+  script: |
+    features:
+    - rename:
+       new-domain: [example.com]
+- title: Dangerous Web operation
+  args:
+    - toggle=enable|disable|delete
+  script: |
+    features:
+    - [enable]

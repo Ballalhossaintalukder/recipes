@@ -1,0 +1,891 @@
+- title: Static Web (HTML)
+  script: |
+    nginx:
+      root: public_html
+      locations:
+      - match: /
+        try_files: $uri $uri/ $uri.html
+      index: index.html
+      error_pages:
+        - 404 /404.html
+  group: HTML
+- title: Static Web (SPA)
+  script: |
+    nginx:
+      root: public_html
+      locations:
+        - match: /
+          try_files: $uri $uri/ $uri.html /index.html
+  group: HTML
+- title: Vite
+  script: |
+    features:
+      - node lts
+    nginx:
+      root: public_html/dist
+    commands:
+      - npm install
+      - npm run build
+  group: HTML
+- title: Gatsby
+  script: |
+    features:
+      - node lts
+    nginx:
+      root: public_html/public
+      locations:
+        - match: /
+          # CSR Only!
+          try_files: $uri $uri/ /index.html
+    commands:
+      - yarn install
+      - yarn build
+  group: HTML
+- title: Docusaurus
+  script: |
+    features:
+      - node lts
+    nginx:
+      root: public_html/build
+      error_pages:
+        - 404 /404.html
+    commands:
+      - yarn install
+      - yarn build
+  group: HTML
+- title: Create React App
+  script: |
+    features:
+      - node lts
+    nginx:
+      root: public_html/build
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.html
+    commands:
+      - yarn install
+      - yarn build
+  group: HTML
+- title: Jekyll
+  script: |
+    features:
+      - ruby latest
+    nginx:
+      root: public_html/_site
+      error_pages:
+        - 404 /404.html
+    commands:
+      - bundle install || (bundle init && bundle add jekyll webrick)
+      - jekyll build
+  group: HTML
+- title: Hugo
+  script: |
+    nginx:
+      root: public_html/public
+    commands:
+    # If you use SCSS, replace "hugo" to "hugo-extended"
+    - curl -sSL https://webi.sh/hugo | sh
+    - script ~/.config/envman/PATH.env
+    - hugo
+  group: HTML
+- title: MkDocs
+  script: |
+    # WIP
+    features:
+      - python stable
+  group: HTML
+- title: Hexo
+  script: |
+    features:
+      - node lts
+  group: HTML
+- title: Slate Docs
+  script: |
+    # WIP
+    features:
+      - ruby latest
+  group: HTML
+- title: PHP Dev (like XAMPP)
+  script: |
+    features:
+      - mysql
+      - php 7.4 # change php version here
+    nginx:
+      root: public_html
+      locations:
+    #   Ability to hide *.php extension in URLs 
+      - match: /
+        try_files: $uri $uri/ $uri.php
+    # Enable directory listing
+      autoindex: on
+      fastcgi: "on"
+    commands:
+    #  ---- quick access to php info ---- 
+      - echo "<?php phpinfo(15);" > phpinfo.php
+    #  ---- init .user.ini (must same as "root" above!) ---- 
+      - INI=.user.ini; rm -f $INI; touch $INI
+    #  ---- show php errors in the browser ---- 
+      - echo "display_errors = On" >> $INI
+      - echo "display_startup_errors = On" >> $INI
+    #  ---- by default opcache caches PHP in 60 seconds
+    #  ---- disable it so file changes are reflected immediately
+      - echo "opcache.revalidate_freq = 0" >> $INI
+  group: PHP
+- title: PHP Index
+  script: |
+    features:
+      - php latest    # or pick version between 7.4 to latest
+    nginx:
+      root: public_html # or public_html/public?
+      fastcgi: "on"
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.php$is_args$args
+  group: PHP
+- title: CodeIgniter 3
+  script: |
+    features:
+      - mysql
+      - php 7.4 # most likely CI3 doesn't work well with 8.x
+    nginx:
+      root: public_html
+      fastcgi: "on"
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.php$is_args$args
+    
+    #   ---- For your security, we avoid PHP processing if user request other than PHP files
+    #   ---- IF YOU USE DYNAMIC FILE/IMAGE GENERATORS THEN DELETE THIS
+        - match: ~ \.[^\/]+(?<!\.php)$
+          try_files: $uri =404
+    
+    commands:
+      - sed -ri "s/(config\['base_url'\]).*/\1 = 'https:\/\/${DOMAIN}\/';/g" application/config/config.php
+      - sed -ri "s/(config\['index_page'\]).*/\1 = '';/g" application/config/config.php
+      - sed -ri "s/('database').*/\1 => '${DATABASE}',/g" application/config/database.php
+      - sed -ri "s/('username').*/\1 => '${USERNAME}',/g" application/config/database.php
+      - sed -ri "s/('password').*/\1 => '${MYPASSWD}',/g" application/config/database.php
+  group: PHP
+- title: CodeIgniter 4
+  script: |
+    features:
+      - mysql
+      - php latest # or pick version between 7.4 to latest
+    nginx:
+      root: public_html/public
+      fastcgi: "on"
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.php$is_args$args
+    
+    #   ---- For your security, we avoid PHP processing if user request other than PHP files
+    #   ---- IF YOU USE DYNAMIC FILE/IMAGE GENERATORS THEN DELETE THIS
+        - match: ~ \.[^\/]+(?<!\.php)$
+          try_files: $uri =404
+    
+    commands:
+    # ---- create .env from env or download from CI4 repo ----
+      - (cp env .env) || https://raw.githubusercontent.com/codeigniter4/CodeIgniter4/refs/heads/develop/env
+      - rm public/.htaccess
+      - sed -ri "s/(# )?app.baseURL.*/app.baseURL = https:\/\/${DOMAIN}/g" .env
+      - sed -ri "s/(# )?database.default.database.*/database.default.database = ${DATABASE}/g" .env
+      - sed -ri "s/(# )?database.default.username.*/database.default.username = ${USERNAME}/g" .env
+      - sed -ri "s/(# )?database.default.password.*/database.default.password = ${MYPASSWD}/g" .env
+      - sed -ri "s/(# )?CI_ENVIRONMENT.*/CI_ENVIRONMENT = production/g" .env 
+    
+    # ---- if you want to debug/code/show errors, uncomment this ----
+    # - echo "opcache.revalidate_freq = 0" >> public/.user.ini
+    # - sed -ri "s/(# )?CI_ENVIRONMENT.*/CI_ENVIRONMENT = development/g" .env 
+    
+    # ---- if you found engine incompability please adjust PHP version above ----
+      - composer install
+  group: PHP
+- title: Laravel (MySQL)
+  script: |
+    features:
+      - mysql
+    # - redis
+      - php latest    # or pick version between 7.4 to latest
+    # - node latest   # uncomment if use pnpm or need specific version
+    nginx:
+      root: public_html/public
+      fastcgi: "on"
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.php$is_args$args
+    
+    #   ---- For your security, we avoid PHP processing if user request other than PHP files
+    #   ---- IF YOU USE DYNAMIC FILE/IMAGE GENERATORS THEN DELETE THIS
+        - match: ~ \.[^\/]+(?<!\.php)$
+          try_files: $uri =404
+    
+    commands:
+    # ---- create .env from .env.example or download from laravel repo ----
+      - (cp .env.example .env) || curl -sSLo .env https://raw.githubusercontent.com/laravel/laravel/refs/heads/12.x/.env.example
+      - sed -ri "s/APP_URL=.*/APP_URL=https:\/\/${DOMAIN}/g" .env
+      - sed -ri "s/(# )?DB_CONNECTION=.*/DB_CONNECTION=mysql/g" .env
+      - sed -ri "s/(# )?DB_HOST=.*/DB_HOST=localhost/g" .env
+      - sed -ri "s/(# )?DB_PORT=.*/DB_PORT=3306/g" .env
+      - sed -ri "s/(# )?DB_DATABASE=.*/DB_DATABASE=${DATABASE}/g" .env
+      - sed -ri "s/(# )?DB_USERNAME=.*/DB_USERNAME=${USERNAME}/g" .env
+      - sed -ri "s/(# )?DB_PASSWORD=.*/DB_PASSWORD=${MYPASSWD}/g" .env
+    
+    # ---- if you need redis, uncomment this and "redis" above ----
+    # - sed -ri "s/(# )?REDIS_PASSWORD=.*/REDIS_PASSWORD=${DATABASE}:::${RDPASSWD}/g" .env
+    # - sed -ri "s/(# )?REDIS_PORT=.*/REDIS_PORT=6479/g" .env
+    
+    # ---- log errors to php error logs and enable debugging ----
+      - sed -ri "s/LOG_STACK=single/LOG_STACK=daily,errorlog/g" .env
+      - sed -ri "s/(# )?APP_DEBUG=.*/APP_DEBUG=true/g" .env
+    
+    # ---- if you want to disable php cache, uncomment this ----
+    # - echo "opcache.revalidate_freq = 0" >> public/.user.ini
+    
+    # ---- if you found engine incompability please change PHP version above ----
+      - composer install
+    
+    #  ---- if you find migration has failing, please fix it and rerun this ----
+      - find database -name "*.sql" -type f -exec sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' {} \; || true
+      - php artisan migrate:fresh --seed || true
+      - php artisan key:generate
+      - php artisan storage:link
+      - npm install
+    
+    #  ---- if you change your frontend servers later please rerun this ----
+      - npm run build
+    
+    #  ---- remnants of local dev server ----
+      - chmod 0750 -R storage || true 
+      - rm -f public/hot
+  group: PHP
+- title: Laravel (PostgreSQL)
+  script: |
+    features:
+      - postgresql
+    # - redis
+      - php latest    # or pick version between 7.4 to latest
+    # - node latest   # uncomment if use pnpm or need specific version
+    nginx:
+      root: public_html/public
+      fastcgi: "on"
+      locations:
+        - match: /
+          try_files: $uri $uri/ /index.php$is_args$args
+    
+    #   ---- For your security, we avoid PHP processing if user request other than PHP files
+    #   ---- IF YOU USE DYNAMIC FILE/IMAGE GENERATORS THEN DELETE THIS
+        - match: ~ \.[^\/]+(?<!\.php)$
+          try_files: $uri =404
+    
+    commands:
+    # ---- create .env from .env.example or download from laravel repo ----
+      - (cp .env.example .env) || curl -sSLo .env https://raw.githubusercontent.com/laravel/laravel/refs/heads/12.x/.env.example
+      - sed -ri "s/APP_URL=.*/APP_URL=https:\/\/${DOMAIN}/g" .env
+      - sed -ri "s/(# )?DB_CONNECTION=.*/DB_CONNECTION=pgsql/g" .env
+      - sed -ri "s/(# )?DB_HOST=.*/DB_HOST=localhost/g" .env
+      - sed -ri "s/(# )?DB_PORT=.*/DB_PORT=5432/g" .env
+      - sed -ri "s/(# )?DB_DATABASE=.*/DB_DATABASE=${DATABASE}/g" .env
+      - sed -ri "s/(# )?DB_USERNAME=.*/DB_USERNAME=${USERNAME}/g" .env
+      - sed -ri "s/(# )?DB_PASSWORD=.*/DB_PASSWORD=${PGPASSWD}/g" .env
+    
+    # ---- if you need redis, uncomment this and "redis" above ----
+    # - sed -ri "s/(# )?REDIS_PASSWORD=.*/REDIS_PASSWORD=${DATABASE}:::${RDPASSWD}/g" .env
+    # - sed -ri "s/(# )?REDIS_PORT=.*/REDIS_PORT=6479/g" .env
+    
+    #   ---- let's disable app debug, see errors to php error logs instead ----
+      - sed -ri "s/LOG_STACK=single/LOG_STACK=daily,errorlog/g" .env
+      - sed -ri "s/(# )?APP_DEBUG=.*/APP_DEBUG=false/g" .env
+    
+    # ---- if you want to debug/code/show errors, uncomment this ----
+    # - echo "opcache.revalidate_freq = 0" >> public/.user.ini
+    # - sed -ri "s/(# )?APP_DEBUG=.*/APP_DEBUG=true/g" .env
+    
+    # ---- if you found engine incompability please adjust PHP version above ----
+      - composer install
+    
+    #  ---- if you find migration has failing, please fix it and rerun this ----
+      - php artisan migrate:fresh --seed || true
+      - php artisan key:generate
+      - php artisan storage:link
+      - npm install
+    
+    #  ---- if you change your frontend servers later please rerun this ----
+      - npm run build
+    
+    #  ---- remnants of local dev server ----
+      - chmod 0750 -R storage || true 
+      - rm -f public/hot
+    
+    # ---- if you planning to code in production, uncomment this ----
+    # - echo "opcache.revalidate_freq = 0" >> public_html/.user.ini
+  group: PHP
+- title: Node app.js
+  script: |
+    # This is a template for simple node server like express/koa.js
+    # There's should not any extra compilation step when using it.
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+    #  ---- Do you have "static" folder set up? put it here. ---- 
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   ---- sets NODE_ENV ----
+        app_env: "production"
+    #   ---- if your main script is not "app.js" change it here ----
+    #   ---- you app MUST listen to $PORT! Change env name if needed  ----
+        app_start_command: env PORT=$PORT node app.js
+    #   --- Sets $PWD. default value is parent of root ---
+    #   passenger_app_root: public_html
+    
+    commands:
+    #  ---- Change "npm" here if needed, it will referred later as $NPM ----
+      - NPM=`which npm`
+      - $NPM install
+      - "[ -f .env ] || touch .env"
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: Node Typescript
+  script: |
+    # This is a template for node server with compile step like typescript
+    # All your compilation step should be in "build" npm script
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+    #  ---- Do you have "static" folder set up? put it here. ---- 
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   ---- sets NODE_ENV ----
+        app_env: "production"
+    #   ---- if your main script is not "dist/src/index.js" change it here ----
+    #   ---- you app MUST listen to $PORT! Change env name if needed  ----
+        app_start_command: env PORT=$PORT node dist/src/index.js
+    #   --- Sets $PWD. default value is parent of root ---
+    #   passenger_app_root: public_html
+    
+    commands:
+    #  ---- Change "npm" here if needed, it will referred later as $NPM ----
+      - NPM=`which npm`
+      - $NPM install
+      - $NPM run build
+      - "[ -f .env ] || touch .env"
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: Next.js
+  script: |
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+    #  ---- Next.js default public folder ---- 
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   ---- sets NODE_ENV ----
+        app_env: "production"
+    #   ---- if your main script is not "yarn start" change it here ----
+        app_start_command: env PORT=$PORT yarn start
+    #   --- Sets $PWD. default value is parent of root ---
+    #   passenger_app_root: public_html
+      locations:
+    #   ---- set up proper next.js static build e-tag cache --- 
+        - match: /_next/static/
+          alias: public_html/.next/static/
+    commands:
+      - 'echo "NEXT_PUBLIC_SITE_URL=\"https://${DOMAIN}\"" >> .env'
+    #  ---- Change "yarn" here if needed, it will referred later as $NPM ----
+      - NPM=`which yarn`
+      - $NPM install
+    
+    # ---- if you change the code or NEXT_PUBLIC_* env, you need to rebuild it ----
+      - $NPM run build
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: Nuxt.js
+  script: |
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+    #  ---- Nuxt.js default public folder ---- 
+      root: public_html/.output/public
+      passenger:
+        enabled: "on"
+    #   ---- sets NODE_ENV ----
+        app_env: "production"
+    #   ---- Nuxt.js has index.js in parent of root so we just use "node server/index.mjs"  ----
+        app_start_command: env PORT=$PORT node server/index.mjs
+    #   ---- Sets $PWD. default value is parent of root  ----
+    #   passenger_app_root: public_html/build
+    commands:
+    #  ---- Change "yarn" here if needed, it will referred later as $NPM ----
+      - NPM=`which yarn`
+      - $NPM install
+      - $NPM run build
+      - "[ -f .env ] || touch .env"
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: SvelteKit
+  script: |
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+    #  ---- SvelteKit default public folder ---- 
+      root: public_html/build/client
+      passenger:
+        enabled: "on"
+    #   ---- sets NODE_ENV ----
+        app_env: "production"
+    #   ---- SvelteKit has index.js in parent of root so we just use "node ."  ----
+        app_start_command: env PORT=$PORT node .
+    #   ---- Sets $PWD. default value is parent of root  ----
+    #   passenger_app_root: public_html/build
+    commands:
+    #  ---- Change "yarn" here if needed, it will referred later as $NPM ----
+      - NPM=`which yarn`
+      - $NPM install
+    
+    # ----- "adapter-auto" won't work with production build, use adapter-node! ----
+      - $NPM add @sveltejs/adapter-node
+      - sed -i "s/adapter-auto/adapter-node/g" svelte.config.js
+      - $NPM run build
+      - "[ -f .env ] || touch .env"
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: Nest.js
+  script: |
+    features:
+      - node lts
+    # - mysql
+    # - postgresql
+    # - redis
+    nginx:
+      index: index.html
+      root: public_html/client
+      passenger:
+        enabled: 'on'
+        app_start_command: env PORT=$PORT node dist/main.js
+    commands:
+    #  ---- Change "yarn" here if needed, it will referred later as $NPM ----
+      - NPM=`which yarn`
+      - $NPM install
+      - nest build
+    
+    #  ---- Choose your database stack (also uncomment related feature above) ----
+    # - echo "DB_CONNECTION=sqlite:////$HOME/db.sqlite" >> .env
+    # - echo "DB_CONNECTION=mysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+    # - echo "DB_CONNECTION=postgresql://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+    # - echo -e "REDIS_HOST=localhost\nREDIS_PORT=6479\nREDIS_PASSWORD=${DATABASE}:::${RDPASSWD}" >> .env
+    
+    #  ---- If you use next-auth ----
+    # - echo AUTH_SECRET=$(openssl rand -base64 33) >> .env
+    # - echo AUTH_TRUST_HOST=true >> .env
+  group: JavaScript
+- title: Deno app.ts
+  script: |
+    features:
+      - deno latest
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: deno run --allow-net app.ts --port=$PORT
+  group: JavaScript
+- title: Bun app.ts
+  script: |
+    features:
+      - bun latest
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT bun app.ts
+  group: JavaScript
+- title: Python app.py
+  script: |
+    features:
+      - python stable
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT python app.py
+        env_var_list:
+    #   --- Do not write .pyc files ---
+        - PYTHONDONTWRITEBYTECODE=1
+    commands:
+      - pip install -r requirements.txt || touch $_
+  group: Python
+- title: Python wsgi.py (WSGI)
+  script: |
+    features:
+      - python stable
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   --- Sets $PWD. default value is parent of root ---
+        app_root: public_html
+    #   ---- sets WSGI_ENV ----
+        app_env: "production"
+    #  --- Use installed python instead of system ---
+        python: .pyenv/shims/python
+        app_type: python
+    #   --- WSGI start file ---
+        startup_file: wsgi.py
+        env_var_list:
+    #   --- Do not write .pyc files ---
+        - PYTHONDONTWRITEBYTECODE=1
+    commands:
+      - pip install -r requirements.txt
+  group: Python
+- title: Streamlit app.py
+  script: |
+    features:
+      - python stable
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        python: .pyenv/shims/python
+        app_start_command: streamlit run app.py --server.port $PORT
+    commands:
+      - pip install -r requirements.txt || pip install streamlit
+  group: Python
+- title: Uvicorn (ASGI)
+  script: |
+    features:
+      - python stable
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: uvicorn main:app --port $PORT
+    commands:
+      - pip install -r requirements.txt || pip install uvicorn
+  group: Python
+- title: Flask
+  script: |
+    features:
+      - python stable
+    nginx:
+    # --- Your static files can be anywhere but usually it's in app/static ---
+      root: public_html/app/static
+      passenger:
+        enabled: "on"
+    #   --- Sets $PWD. default value is parent of root ---
+        app_root: public_html
+    #   ---- sets WSGI_ENV ----
+        app_env: "production"
+    #  --- Use installed python instead of system ---
+        python: .pyenv/shims/python
+        app_type: python
+    #   --- WSGI start file (we write it below) ---
+        startup_file: wsgi.py
+        env_var_list:
+    #   --- Do not write .pyc files ---
+        - PYTHONDONTWRITEBYTECODE=1
+    
+    commands:
+      - pip install -r requirements.txt || pip install flask
+    
+    #   --- Write WSGI start file ---
+      - filename: wsgi.py
+        content: | 
+          # We expect you export app variable in app/__init__.py or app.py!
+          from app import app as application
+          application.config.from_file(".env")
+      - "[ -f .env ] || touch .env"
+    
+    #  --- Write envars for Auth + HTTPS config + Flask-SQLAlchemy SQLITE ---
+      - sed -ri '/^(SECRET_KEY|SESSION_COOKIE_SECURE|PREFERRED_URL_SCHEME|SQLALCHEMY_DATABASE_URI)=/d' .env
+      - echo "SECRET_KEY=$(openssl rand -base64 32)" >> .env
+      - echo "SESSION_COOKIE_SECURE=True" >> .env
+      - echo "PREFERRED_URL_SCHEME=https" >> .env
+      - echo "SQLALCHEMY_DATABASE_URI=sqlite:////$HOME/db.sqlite" >> .env
+  group: Python
+- title: Flask (MySQL)
+  script: |
+    features:
+      - python stable
+      - mysql
+    nginx:
+    # --- Your static files can be anywhere but usually it's in app/static ---
+      root: public_html/app/static
+      passenger:
+        enabled: "on"
+    #   --- Sets $PWD. default value is parent of root ---
+        app_root: public_html
+    #   ---- sets WSGI_ENV ----
+        app_env: "production"
+    #  --- Use installed python instead of system ---
+        python: .pyenv/shims/python
+        app_type: python
+    #   --- WSGI start file (we write it below) ---
+        startup_file: wsgi.py
+        env_var_list:
+    #   --- Do not write .pyc files ---
+        - PYTHONDONTWRITEBYTECODE=1
+    
+    commands:
+      - pip install -r requirements.txt || pip install flask pymysql
+    
+    #   --- Write WSGI start file ---
+      - filename: wsgi.py
+        content: | 
+          # We expect you export app variable in app/__init__.py or app.py!
+          from app import app as application
+          application.config.from_file(".env")
+      - "[ -f .env ] || touch .env"
+    
+    #  --- Write envars for Auth + HTTPS config + Flask-SQLAlchemy PyMySQL ---
+      - sed -ri '/^(SECRET_KEY|SESSION_COOKIE_SECURE|PREFERRED_URL_SCHEME|SQLALCHEMY_DATABASE_URI)=/d' .env
+      - echo "SECRET_KEY=$(openssl rand -base64 32)" >> .env
+      - echo "SESSION_COOKIE_SECURE=True" >> .env
+      - echo "PREFERRED_URL_SCHEME=https" >> .env
+      - echo "SQLALCHEMY_DATABASE_URI=mysql+pymysql://$USERNAME:$MYPASSWD@localhost/$DATABASE" >> .env
+  group: Python
+- title: Flask (PostgreSQL)
+  script: |
+    features:
+      - python stable
+      - postgresql
+    nginx:
+    # --- Your static files can be anywhere but usually it's in app/static ---
+      root: public_html/app/static
+      passenger:
+        enabled: "on"
+    #   --- Sets $PWD. default value is parent of root ---
+        app_root: public_html
+    #   ---- sets WSGI_ENV ----
+        app_env: "production"
+    #  --- Use installed python instead of system ---
+        python: .pyenv/shims/python
+        app_type: python
+    #   --- WSGI start file (we write it below) ---
+        startup_file: wsgi.py
+        env_var_list:
+    #   --- Do not write .pyc files ---
+        - PYTHONDONTWRITEBYTECODE=1
+    
+    commands:
+      - pip install -r requirements.txt || pip install flask psycopg2-binary
+    
+    #   --- Write WSGI start file ---
+      - filename: wsgi.py
+        content: | 
+          # We expect you export app variable in app/__init__.py or app.py!
+          from app import app as application
+          application.config.from_file(".env")
+      - "[ -f .env ] || touch .env"
+    
+    #  --- Write envars for Auth + HTTPS config + Flask-SQLAlchemy PsyCopg2 ---
+      - sed -ri '/^(SECRET_KEY|SESSION_COOKIE_SECURE|PREFERRED_URL_SCHEME|SQLALCHEMY_DATABASE_URI)=/d' .env
+      - echo "SECRET_KEY=$(openssl rand -base64 32)" >> .env
+      - echo "SESSION_COOKIE_SECURE=True" >> .env
+      - echo "PREFERRED_URL_SCHEME=https" >> .env
+      - echo "SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://$USERNAME:$PGPASSWD@localhost/$DATABASE" >> .env
+  group: Python
+- title: Django
+  script: |
+    features:
+      - python stable
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        python: .pyenv/shims/python
+    commands:
+      - pip install -r requirements.txt || pip install django
+      - sed -i "s/ALLOWED_HOSTS = \[\]/ALLOWED_HOSTS = \['${DOMAIN}'\]/g" app/settings.py
+      - echo "from app.wsgi import application" > passenger_wsgi.py
+      - python manage.py migrate || true
+  group: Python
+- title: Ruby config.ru
+  script: |
+    features:
+      - ruby latest
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   ---- sets RAILS_ENV ----
+        app_env: "production"
+    # ---- use ruby from RVM instead of system ---
+        ruby: .rvm/rubies/default/bin/ruby
+    commands:
+      - bundle install || bundle init
+      - gem install rack
+  group: Ruby
+- title: Ruby on Rails
+  script: |
+    features:
+      - ruby latest
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+    #   ---- sets RAILS_ENV ----
+        app_env: "production"
+    # ---- use ruby from RVM instead of system ---
+        ruby: .rvm/rubies/default/bin/ruby
+    commands:
+      - bundle install || (bundle init && bundle add rails)
+    # ---- let's pin RAILS_ENV=production so migration works
+      - "[[ -z $RAILS_ENV ]] && echo 'export RAILS_ENV=production' >> ~/.bashrc && export RAILS_ENV=production"
+      - rails db:migrate || true
+      - rails db:seed || true
+      - rake assets:precompile
+  group: Ruby
+- title: Go (Go Run)
+  script: |
+    features:
+      - go
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT go run .
+    commands:
+      - go mod download
+  group: Go
+- title: Go (Binary Build)
+  script: |
+    features:
+      - go
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT ./app
+    commands:
+      - go mod download
+      - go build -o app
+  group: Go
+- title: Rust (Cargo Run)
+  script: |
+    features:
+      - rust
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT cargo run
+    commands:
+      - cargo build
+  group: Rust
+- title: Rust (Binary Build)
+  script: |
+    features:
+      - rust
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT ./target/release/app
+    commands:
+      - cargo build --release -o target/release/app
+  group: Rust
+- title: Zig (Binary Build)
+  script: |
+    features:
+      - zig latest
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT ./zig-out/bin/app
+    commands:
+      - zig build
+  group: Zig
+- title: Java Main.java
+  script: |
+    features:
+      - java
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT java Main.java
+  group: Java
+- title: Dotnet Run
+  script: |
+    features:
+      - dotnet lts
+    nginx:
+      root: public_html/public
+      passenger:
+        enabled: "on"
+        app_start_command: env PORT=$PORT dotnet run
+  group: Dotnet
+- title: Docker Compose
+  script: |
+    features: 
+    - docker
+    services: docker-compose.yml
+  group: Docker
+- title: Lazyvim
+  script: |
+    features:
+    - nvim
+  group: Tools
+

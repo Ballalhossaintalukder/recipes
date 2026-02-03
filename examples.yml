@@ -1,0 +1,568 @@
+- name: php
+  source: clear
+  features:
+    - php latest
+  nginx:
+    fastcgi: "on"
+    root: public_html
+  commands:
+    - filename: index.php
+      content: |
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>PHP App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from PHP version <?= phpversion() ?></p>
+            <p><a href="phpinfo.php">See phpinfo()</a></p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+    - echo "<?php phpinfo(15);" > phpinfo.php
+    - echo "display_errors = On" > .user.ini
+    - echo "display_startup_errors = On" >> .user.ini
+- name: python
+  source: clear
+  features:
+    - python stable
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      startup_file: app.py
+      app_type: python
+      python: .pyenv/shims/python
+  commands:
+    - filename: app.py
+      content: |
+        import platform
+  
+        html_text = '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Python App</title>
+            <link rel="stylesheet" href="%s">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="%s" class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Python version %s</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        ''' % (
+          '//unpkg.com/bootstrap/dist/css/bootstrap.min.css',
+          '//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200',
+          platform.python_version(),
+        )
+  
+        def application(environ, start_response):
+            status = '200 OK'
+            response_headers = [('Content-type', 'text/html')]
+            start_response(status, response_headers)
+            return [html_text.encode('utf-8')]
+- name: node
+  source: clear
+  features:
+    - node lts
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_type: node
+      startup_file: app.js
+      node: .local/opt/node/bin/node
+  commands:
+    - filename: app.js
+      content: |
+        const http = require('http');
+        const html_text = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Node App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Node version ${process.version}</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        `
+        const server = http.createServer((req, res) => {
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'text/html');
+          res.end(html_text);
+        });
+        server.listen(process.env.PORT || 8080);
+- name: bun
+  source: clear
+  features:
+    - bun latest
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT bun app.ts
+  commands:
+    - filename: app.ts
+      content: |
+        const html_text = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Bun App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Bun version ${Bun.version}</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        `
+        const server = Bun.serve({
+          fetch(request) {
+              return new Response(html_text, {
+                headers: { "Content-Type": "text/html" },
+              });
+          },
+        });
+- name: deno
+  source: clear
+  features:
+    - deno latest
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: deno run --allow-net app.ts --port=$PORT
+  commands:
+    - filename: app.ts
+      content: |
+        import { parse } from "https://deno.land/std@0.194.0/flags/mod.ts";
+  
+        const flags = parse(Deno.args, {
+            string: ["port"],
+            default: { port: "8080" },
+        });
+  
+        const html_text = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Deno App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Deno version ${Deno.version.deno}</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        `
+  
+        const server = Deno.listen({ port: parseInt(flags.port) });
+  
+        for await (const conn of server) {
+          serveHttp(conn);
+        }
+  
+        async function serveHttp(conn: Deno.Conn) {
+          const httpConn = Deno.serveHttp(conn);
+          for await (const requestEvent of httpConn) {
+            requestEvent.respondWith(
+              new Response(html_text, {
+                headers: {
+                    "content-type": "text/html",
+                },
+                status: 200,
+              }),
+            );
+          }
+        }- name: ruby
+  features:
+    - ruby latest
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      ruby: .rvm/rubies/default/bin/ruby
+  source: clear
+  commands:
+    - filename: app.rb
+      content: |
+        $html_text = <<-TEXT
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Ruby App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Ruby version %{ver}</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        TEXT
+  
+        class App
+          def call(env)
+            return [200, 
+                {"content-type" => "text/html"}, 
+                [$html_text % {ver: RUBY_VERSION}]]
+          end
+        end
+    - filename: config.ru
+      content: |
+        require './app'
+        run App.new
+    - gem install rack
+- name: go
+  source: clear
+  features:
+    - go
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT ./main
+  commands:
+    - filename: main.go
+      content: |
+        package main
+  
+        import (
+          "fmt"
+          "net/http"
+          "os"
+          "runtime"
+          "strings"
+        )
+  
+        const html_text = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Go App</title>
+          <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+          <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+              class="img-fluid rounded-circle"></p>
+          <h1 class="mb-3">Hello, world!</h1>
+          <p>Serving from Go version %s</p>
+          <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        `
+  
+        func home(w http.ResponseWriter, req *http.Request) {
+          w.Header().Set("Content-Type", "text/html")
+          version := strings.Replace(runtime.Version(), "go", "", 1)
+          fmt.Fprintf(w, html_text, version)
+        }
+  
+        func main() {
+          http.HandleFunc("/", home)
+          port := os.Getenv("PORT")
+          if port == "" {
+            fmt.Print("PORT environment variable not set")
+            os.Exit(1)
+          }
+          http.ListenAndServe("127.0.0.1:"+port, nil)
+        }
+  
+    - go build main.go
+- name: dotnet
+  source: clear
+  features:
+    - dotnet latest
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT dotnet run
+  commands:
+    - dotnet new console --name App
+    - filename: Program.cs
+      content: |
+        using System.Text;
+        using System.Net;
+        class HttpServer
+        {
+            public static HttpListener listener = new();
+            public static string pageBody = @"      
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>DotNet App</title>
+                <link rel=""stylesheet"" href=""//unpkg.com/bootstrap/dist/css/bootstrap.min.css"">
+            </head>
+            <body class=""p-5 text-center"">
+                <p><img src=""//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200"" 
+                    class=""img-fluid rounded-circle""></p>
+                <h1 class=""mb-3"">Hello, world!</h1>
+                <p>Serving from DotNet version {0}</p>
+                <p class=""text-muted"">DOM Cloud</p>
+            </body>
+            </html>
+            ";
+  
+  
+            public static async Task HandleIncomingConnections()
+            {
+                string version = Environment.Version.ToString();
+                byte[] pageData = Encoding.UTF8.GetBytes(string.Format(pageBody, version));
+                while (true)
+                {
+                    // Will wait here until we hear from a connection
+                    HttpListenerContext ctx = await listener.GetContextAsync();
+  
+                    // Peel out the requests and response objects
+                    HttpListenerResponse resp = ctx.Response;
+  
+                    resp.ContentType = "text/html";
+                    resp.ContentEncoding = Encoding.UTF8;
+                    resp.ContentLength64 = pageData.LongLength;
+  
+                    await resp.OutputStream.WriteAsync(pageData);
+                    resp.Close();
+                }
+            }
+  
+            public static void Main(string[] args)
+            {
+                // Create a Http server and start listening for incoming connections
+                string? port = Environment.GetEnvironmentVariable("PORT") ?? "3000";
+                listener.Prefixes.Add($"http://localhost:{port}/");
+                listener.Start();
+                Console.WriteLine("Listening for connections on localhost:{0}", port);
+  
+                // Handle requests
+                Task listenTask = HandleIncomingConnections();
+                listenTask.GetAwaiter().GetResult();
+  
+                // Close the listener
+                listener.Close();
+            }
+        }
+- name: java
+  source: clear
+  features:
+    - java
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT java Main.java
+  commands:
+    - filename: Main.java
+      content: |
+        import java.io.IOException;
+        import java.io.OutputStream;
+        import java.net.InetSocketAddress;
+  
+        import com.sun.net.httpserver.HttpExchange;
+        import com.sun.net.httpserver.HttpHandler;
+        import com.sun.net.httpserver.HttpServer;
+  
+        public class Main {
+            public static void main(String[] args) throws Exception {
+                String portStr = System.getenv("PORT");
+                int port = portStr == null ? 3000 : Integer.parseInt(portStr);
+                HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+                System.out.println("Server is listening to localhost:" + port);
+                server.createContext("/", new DefaultHandler());
+                server.setExecutor(null); // creates a default executor
+                server.start();
+            }
+        }
+  
+        class DefaultHandler implements HttpHandler {
+            private static String template = """
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Java App</title>
+                <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+              </head>
+              <body class="p-5 text-center">
+                <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+                <h1 class="mb-3">Hello, world!</h1>
+                <p>Serving from Java version %s</p>
+                <p class="text-muted">DOM Cloud</p>
+              </body>
+              </html>
+            """;
+  
+            public void handle(HttpExchange t) throws IOException {
+                String version = Runtime.version().toString();
+                String response = String.format(template, version);
+                t.sendResponseHeaders(200, response.length());
+                OutputStream os = t.getResponseBody();
+                os.write(response.getBytes());
+                os.close();
+            }
+        }
+- name: rust
+  source: clear
+  features:
+    - rust
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT ./main
+  commands:
+    - filename: main.rs
+      content: |
+        use std::{env,str};
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::process::Command;
+  
+        const HTTP_HEADER: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
+        const HTML_TEXT: &str = r#"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rust App</title>
+            <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+        </head>
+        <body class="p-5 text-center">
+            <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+                    class="img-fluid rounded-circle"></p>
+            <h1 class="mb-3">Hello, world!</h1>
+            <p>Serving from Rust version {}</p>
+            <p class="text-muted">DOM Cloud</p>
+        </body>
+        </html>
+        "#;
+  
+        fn get_version() -> String {
+            let stdout = Command::new("rustc")
+                .arg("-V")
+                .output()
+                .expect("failed to execute process")
+                .stdout;
+  
+            let text = str::from_utf8(&stdout).unwrap().to_string();
+            let chunks: Vec<&str> = text.split(" ").collect();
+  
+            chunks[1].to_string()
+        }
+  
+        fn main() {
+            let port = env::var("PORT").expect("$PORT is not set");
+            let socket_addr = "127.0.0.1".to_string() + ":" + &port;
+            let listener = TcpListener::bind(socket_addr).unwrap();
+            let version = get_version();
+            println!("Listening for connections on port {}", port);
+  
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut stream) => {
+                        let response = HTTP_HEADER.to_string() + &HTML_TEXT.replace("{}", &version);
+                        stream.write(response.as_bytes()).unwrap();
+                    }
+                    Err(e) => {
+                        println!("Unable to connect: {}", e);
+                    }
+                }
+            }
+        }
+    - rustc main.rs
+- name: zig
+  source: clear
+  features:
+    - zig
+  nginx:
+    root: public_html/public
+    passenger:
+      enabled: "on"
+      app_start_command: env PORT=$PORT ./main
+  commands:
+    - filename: main.zig
+      content: |
+        const std = @import("std");
+        const debug = std.debug;
+        const getenv = std.os.getenv;
+        const Server = std.http.Server;
+        const parseInt = std.fmt.parseInt;
+        const allocPrintZ = std.fmt.allocPrintZ;
+        const parseIp = std.net.Address.parseIp;
+    
+        const body =
+            \\<!DOCTYPE html>
+            \\<html>
+            \\<head>
+            \\  <title>Zig App</title>
+            \\  <link rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css">
+            \\</head>
+            \\<body class="p-5 text-center">
+            \\  <p><img src="//images.unsplash.com/photo-1465153690352-10c1b29577f8?fit=crop&w=200&h=200" 
+            \\      class="img-fluid rounded-circle"></p>
+            \\  <h1 class="mb-3">Hello, world!</h1>
+            \\  <p>Serving from Zig version {s}</p>
+            \\  <p class="text-muted">DOM Cloud</p>
+            \\</body>
+            \\</html>
+        ;
+    
+        pub fn getVersion(allocator: std.mem.Allocator) []const u8 {
+            const zV = std.ChildProcess.exec(.{
+                .allocator = allocator,
+                .argv = &[_][]const u8{ "zig", "version" },
+            }) catch unreachable;
+            defer allocator.free(zV.stderr);
+            return zV.stdout;
+        }
+    
+        pub fn main() !void {
+            var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+            const allocator = gpa.allocator();
+            var server = Server.init(allocator, .{ .reuse_address = true });
+            const port = try parseInt(u16, getenv("PORT") orelse "3000", 10);
+            try server.listen(try parseIp("127.0.0.1", port));
+            debug.print("Listening to 127.0.0.1:{d}\n", .{port});
+            const version = getVersion(allocator);
+            const respBody = try allocPrintZ(allocator, body, .{version});
+    
+            defer allocator.free(respBody);
+            defer allocator.free(version);
+            defer server.deinit();
+            defer debug.assert(gpa.deinit() == .ok);
+    
+            while (true) {
+                var resp = try server.accept(.{ .allocator = allocator });
+                defer resp.deinit();
+                while (resp.reset() != .closing) {
+                    try resp.wait();
+    
+                    resp.transfer_encoding = .{ .content_length = respBody.len };
+                    try resp.headers.append("Content-Type", "text/http");
+                    try resp.do();
+                    try resp.writeAll(respBody);
+                    try resp.finish();
+                }
+            }
+        }
+    - zig build-exe main.zig 
